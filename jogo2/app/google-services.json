@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "679563044298",
+    "project_id": "jogo-15b14",
+    "storage_bucket": "jogo-15b14.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:679563044298:android:5595521407317303f51b33",
+        "android_client_info": {
+          "package_name": "com.example.jogo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-cDJIeUFggX6ODdc2T70MF37bqmLnsT0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
