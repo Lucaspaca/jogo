@@ -52,5 +52,4 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx:24.1.1")
     implementation("androidx.test.ext:junit:1.1.3")
     implementation("androidx.core:core-ktx:1.6.0")
-
 }

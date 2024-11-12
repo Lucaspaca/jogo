@@ -23,6 +23,7 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.Map;
 import java.util.HashMap;
 import android.util.Log;
+import com.example.mathlibrary.FirebaseUtils;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -122,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
     private void finishRace() {
         isPaused = true;
 
+        // Para todos os carros na corrida
         for (Car car : cars) {
             car.parar();
         }
@@ -133,8 +135,20 @@ public class MainActivity extends AppCompatActivity {
                 mainLayout.removeView(carImageView);
             }
             carImageViews.clear();
-
             cars.clear();
+
+            // Limpa o banco de dados após a finalização da corrida
+            FirebaseUtils.clearDatabase(new FirebaseUtils.DatabaseClearCallback() {
+                @Override
+                public void onSuccess() {
+                    Log.d("MainActivity", "Banco de dados apagado com sucesso após a finalização da corrida!");
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    Log.e("MainActivity", "Erro ao apagar banco de dados: " + e.getMessage());
+                }
+            });
         }, 100);
     }
 
@@ -226,28 +240,33 @@ public class MainActivity extends AppCompatActivity {
         new Thread(car).start();
     }
     private void retrieveSavedCars() {
-        db.collection("carros").get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        for (DocumentSnapshot document : task.getResult()) {
-                            Map<String, Object> carData = document.getData();
-                            restoreCar(carData); // Restaura o carro a partir dos dados recuperados
-                        }
-                    } else {
-                        // Erro ao recuperar dados
-                    }
-                });
+        FirebaseUtils.retrieveSavedCars(new FirebaseUtils.CarRetrieveCallback() {
+            @Override
+            public void onSuccess(List<Map<String, Object>> carsData) {
+                for (Map<String, Object> carData : carsData) {
+                    restoreCar(carData); // Restaura cada carro a partir dos dados recuperados
+                }
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                Log.e("MainActivity", "Erro ao recuperar dados dos carros: " + e.getMessage());
+            }
+        });
     }
     private void saveCarStates() {
         for (Car car : cars) {
-            db.collection("carros").document(car.getName())
-                    .set(car.toMap()) // Método para mapear os atributos do carro
-                    .addOnSuccessListener(aVoid -> {
-                        // Salvo com sucesso
-                    })
-                    .addOnFailureListener(e -> {
-                        // Tratamento de erro
-                    });
+            FirebaseUtils.saveCarState(car.getName(), car.toMap(), new FirebaseUtils.CarSaveCallback() {
+                @Override
+                public void onSuccess() {
+                    // Carro salvo com sucesso
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    Log.e("MainActivity", "Erro ao salvar estado do carro: " + e.getMessage());
+                }
+            });
         }
     }
 

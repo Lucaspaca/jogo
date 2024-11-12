@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.ImageView;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Semaphore;
 import android.os.Handler;
 import java.util.Map;
@@ -34,6 +35,9 @@ public class Car extends Thread implements Veiculo {
     private Bitmap bitmap;
     private int penalty;
     private boolean isSafetyCar;;
+    private static final int MIN_SPEED = 5;
+    private static final int MAX_SPEED = 12;
+    private Random random = new Random();
 
     public Car(String name, double x, double y, double speed, int sensorRange,
                View trackView, double d,
@@ -97,6 +101,9 @@ public class Car extends Thread implements Veiculo {
     public void updateBitmap() {
         this.bitmap = getBitmapFromView(trackView);
     }
+    private void setRandomSpeed() {
+        this.speed = MIN_SPEED + random.nextInt(MAX_SPEED - MIN_SPEED + 1);
+    }
 
     public void checkCollision() {
         // Verifica colisão com bordas da pista
@@ -105,12 +112,13 @@ public class Car extends Thread implements Veiculo {
         }
 
         // Verifica colisão com outros carros
-        for (Car otherCar : MainActivity.cars) {  // Supondo que cars é acessível como lista pública ou estática.
+        for (Car otherCar : MainActivity.cars) {
             if (otherCar != this && Math.hypot(otherCar.getX() - this.x, otherCar.getY() - this.y) < carWidth) {
                 penalty++;
             }
         }
     }
+
     @Override
     public void run() {
         boolean inRestrictedRegion = false; // Controle para saber se o carro está na região
@@ -120,14 +128,17 @@ public class Car extends Thread implements Veiculo {
         while (isRunning) {
             if (!isPaused) {
                 try {
+                    // Ajusta a velocidade do carro aleatoriamente entre 5 e 25
+                    setRandomSpeed();
+
                     // Verifica se o carro está para entrar na região restrita
-                    if (MathUtils.isInRestrictedRegion((int) x, (int) y, MainActivity.regionLeft, MainActivity.regionRight, MainActivity.regionBottom, MainActivity.regionTop) && !inRestrictedRegion) {
-                        MainActivity.regionSemaphore.acquire(); // Tenta adquirir o permissão
+                    if (isInRestrictedRegion() && !inRestrictedRegion) {
+                        MainActivity.regionSemaphore.acquire(); // Tenta adquirir o permit
                         inRestrictedRegion = true; // Marca que o carro está na região
                     }
 
-                    // Se o carro saiu da região restrita, libera o permissão
-                    if (!MathUtils.isInRestrictedRegion((int) x, (int) y, MainActivity.regionLeft, MainActivity.regionRight, MainActivity.regionBottom, MainActivity.regionTop) && inRestrictedRegion) {
+                    // Se o carro saiu da região restrita, libera o permit
+                    if (!isInRestrictedRegion() && inRestrictedRegion) {
                         MainActivity.regionSemaphore.release();
                         inRestrictedRegion = false;
                     }
@@ -170,7 +181,7 @@ public class Car extends Thread implements Veiculo {
             }
 
             try {
-                Thread.sleep(80);
+                Thread.sleep(43);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -183,70 +194,17 @@ public class Car extends Thread implements Veiculo {
     }
 
 
-    public void updateRotation(Point target) {
+        public void updateRotation(Point target) {
         if (target != null) {
-            double deltaX = target.x - x;
-            double deltaY = target.y - y;
-            double angleToTarget = Math.toDegrees(Math.atan2(deltaY, deltaX));
-            float currentRotation = carImageView.getRotation();
-            float rotationDifference = (float) (angleToTarget - currentRotation);
-            rotationDifference = (rotationDifference + 180) % 360 - 180;
-
-            if (Math.abs(rotationDifference) > 5) {
-                rotationDifference = (rotationDifference > 0 ? 5 : -5);
-            }
-            carImageView.setRotation(currentRotation + rotationDifference);
+            double angleToTarget = MathUtils.calculateAngle(getPosicao(), target);
+            float newRotation = MathUtils.updateRotation(carImageView.getRotation(), angleToTarget);
+            carImageView.setRotation(newRotation);
         }
     }
+
     public List<Point> scanForWhitePixels() {
-        List<Point> whitePixels = new ArrayList<>();
-
-        if (bitmap != null) {
-            Point frontPosition = getFrontPosition();
-            int width = bitmap.getWidth();
-            int height = bitmap.getHeight();
-
-            double angleRad = Math.toRadians(angle);
-            double halfConeRad = Math.PI / 2; // 45 graus para cada lado
-
-            int sensorRangeSquared = sensorRange * sensorRange;
-
-            for (int i = -sensorRange; i <= sensorRange; i++) {
-                for (int j = -sensorRange; j <= sensorRange; j++) {
-                    if (i * i + j * j > sensorRangeSquared) {
-                        continue; // fora do alcance circular do sensor
-                    }
-
-                    // Verifica se a distância ao centro do carro está dentro do raio d
-                    double distanceToCar = Math.sqrt(i * i + j * j);
-                    if (distanceToCar > d) {
-                        continue; // fora do alcance de leitura
-                    }
-
-                    // Cálculo do ângulo do pixel em relação à direção do sensor
-                    double pixelAngle = Math.atan2(j, i);
-                    double angleDiff = pixelAngle - angleRad;
-
-                    // Ajusta a diferença de ângulo para o intervalo -PI a PI
-                    if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-                    if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-
-                    if (angleDiff >= -halfConeRad && angleDiff <= halfConeRad) {
-                        int pixelX = frontPosition.x + i;
-                        int pixelY = frontPosition.y + j;
-
-                        // Verifica se o pixel está dentro do bitmap
-                        if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
-                            int pixelColor = bitmap.getPixel(pixelX, pixelY);
-                            if (Color.red(pixelColor) == 255 && Color.green(pixelColor) == 255 && Color.blue(pixelColor) == 255) {
-                                whitePixels.add(new Point(pixelX, pixelY));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return whitePixels;
+        Point frontPosition = getFrontPosition();
+        return MathUtils.scanForWhitePixels(bitmap, frontPosition, angle, sensorRange, d);
     }
 
     private Bitmap getBitmapFromView(View view) {
@@ -261,47 +219,45 @@ public class Car extends Thread implements Veiculo {
     }
 
     public Point calculateCenterOfMass() {
-        List<Point> whitePixels = scanForWhitePixels();
-
-        int sumX = 0;
-        int sumY = 0;
-        for (Point p : whitePixels) {
-            sumX += p.x;
-            sumY += p.y;
-        }
-
-        int centerX = sumX / whitePixels.size();
-        int centerY = sumY / whitePixels.size();
-
-        centerOfMass = new Point(centerX, centerY);
+        // Usa o novo método para obter pixels brancos e dos carros
+        List<Point> relevantPixels = scanForCarPixels();
+        centerOfMass = MathUtils.calculateCenterOfMass(relevantPixels);
         return centerOfMass;
     }
 
+    @Override
     public void moveTowards(Point target) {
         if (target != null) {
-            double deltaX = target.x - x;
-            double deltaY = target.y - y;
-            double angleToTarget = Math.atan2(deltaY, deltaX);
+            Point newPosition = MathUtils.moveTowards(getPosicao(), target, speed);
 
-            // Movimentação do carro em direção ao alvo
-            x += Math.cos(angleToTarget) * speed;
-            y += Math.sin(angleToTarget) * speed;
+            // Adiciona lógica para evitar colisão
+            for (Car otherCar : MainActivity.cars) {
+                if (otherCar != this) {
+                    double distanceToOtherCar = Math.hypot(otherCar.getX() - newPosition.x, otherCar.getY() - newPosition.y);
 
-            // Atualiza o ângulo de direção
-            angle = Math.toDegrees(angleToTarget);
+                    // Ajusta posição para evitar colisão se muito próximo
+                    if (distanceToOtherCar < carWidth) {
+                        newPosition.x += (this.x - otherCar.getX()) * 2; // Ajuste pequeno
+                        newPosition.y += (this.y - otherCar.getY()) * 2;
+                    }
+                }
+            }
 
+            // Atualiza a posição e o ângulo do carro
+            this.x = newPosition.x;
+            this.y = newPosition.y;
+            this.angle = MathUtils.calculateAngle(getPosicao(), target);
         }
     }
 
     public Point getFrontPosition() {
-        double angleRad = Math.toRadians(angle);
-        int frontX = (int) (x + Math.cos(angleRad) * 30);
-        int frontY = (int) (y + Math.sin(angleRad) * 40);
-        return new Point(frontX, frontY);
+        return MathUtils.getFrontPosition(getPosicao(), angle);
     }
 
     public Point getCenterOfMassPosition() {
-        Point centerMass = calculateCenterOfMass();
+        // Usa o novo método de cálculo do centro de massa que inclui os carros
+        Point centerMass = calculateCenterOfMass
+                ();
         return (centerMass != null) ? centerMass : getFrontPosition();
     }
 
@@ -327,10 +283,10 @@ public class Car extends Thread implements Veiculo {
         this.x = x;
         this.y = y;
     }
-//    private boolean isInRestrictedRegion() {
-//        return x >= MainActivity.regionLeft && x <= MainActivity.regionRight &&
-//                y >= MainActivity.regionBottom && y <= MainActivity.regionTop;
-//    }
+    private boolean isInRestrictedRegion() {
+        return x >= MainActivity.regionLeft && x <= MainActivity.regionRight &&
+                y >= MainActivity.regionBottom && y <= MainActivity.regionTop;
+    }
 
     public Map<String, Object> toMap() {
         Map<String, Object> carData = new HashMap<>();
@@ -344,6 +300,27 @@ public class Car extends Thread implements Veiculo {
         // Adicione outros atributos necessários
         return carData;
     }
+
+    public List<Point> scanForCarPixels() {
+        Point frontPosition = getFrontPosition();
+        List<Point> detectedPixels = MathUtils.scanForWhitePixels(bitmap, frontPosition, angle, sensorRange, d);
+
+        // Verifica a posição dos outros carros na área de varredura e adiciona seus pixels
+        for (Car otherCar : MainActivity.cars) {
+            if (otherCar != this) { // Ignora o próprio carro
+                Point otherCarPos = otherCar.getPosicao();
+
+                // Verifica se o outro carro está dentro do alcance do sensor
+                if (Math.hypot(otherCarPos.x - this.x, otherCarPos.y - this.y) <= sensorRange) {
+                    detectedPixels.add(otherCarPos);
+                }
+            }
+        }
+
+        return detectedPixels;
+    }
+
+
 
 }
 
