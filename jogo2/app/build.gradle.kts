@@ -39,17 +39,30 @@ dependencies {
     implementation(libs.activity)
     implementation(libs.constraintlayout)
     implementation(project(":MathLibrary"))
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.ext.junit)
-    androidTestImplementation(libs.espresso.core)
+    implementation(libs.core)
+    implementation(libs.firebase.database)
+
+    // Dependências de teste
+    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit.jupiter)
+    androidTestImplementation("androidx.test.ext:junit:1.1.3")
+    androidTestImplementation("androidx.espresso:espresso-core:3.4.0")
+    testImplementation("org.mockito:mockito-core:4.8.0")
+    testImplementation(("org.mockito:mockito-inline:4.8.0"))
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
+    testImplementation ("org.junit.jupiter:junit-jupiter-engine:5.9.0")
+    testRuntimeOnly ("org.junit.platform:junit-platform-launcher:1.9.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.9.0")
+
+
+
+    // Dependências do Firebase
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-firestore:24.8.1")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.9.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-common-ktx:20.2.0")
     implementation("com.google.firebase:firebase-firestore-ktx:24.1.1")
-    implementation("androidx.test.ext:junit:1.1.3")
     implementation("androidx.core:core-ktx:1.6.0")
 }

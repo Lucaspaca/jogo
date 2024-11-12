@@ -105,6 +105,13 @@ public class Car extends Thread implements Veiculo {
         this.speed = MIN_SPEED + random.nextInt(MAX_SPEED - MIN_SPEED + 1);
     }
 
+    public void setX(double x) {
+        this.x = x;
+    }
+    public void setY(double y) {
+        this.y = y;
+    }
+
     public void checkCollision() {
         // Verifica colisão com bordas da pista
         if (x < 0 || x > trackView.getWidth() || y < 0 || y > trackView.getHeight()) {
@@ -283,7 +290,7 @@ public class Car extends Thread implements Veiculo {
         this.x = x;
         this.y = y;
     }
-    private boolean isInRestrictedRegion() {
+    public boolean isInRestrictedRegion() {
         return x >= MainActivity.regionLeft && x <= MainActivity.regionRight &&
                 y >= MainActivity.regionBottom && y <= MainActivity.regionTop;
     }
@@ -319,8 +326,6 @@ public class Car extends Thread implements Veiculo {
 
         return detectedPixels;
     }
-
-
 
 }
 
