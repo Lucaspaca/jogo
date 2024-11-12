@@ -208,16 +208,23 @@ public class MainActivity extends AppCompatActivity {
 
         new Thread(safetyCar).start();
     }
+
     private void restoreCar(Map<String, Object> carData) {
         double x = (double) carData.get("x");
         double y = (double) carData.get("y");
+        double rotation = (double) carData.get("rotation"); // Recuperando a rotação
         double speed = (double) carData.get("speed");
         int sensorRange = ((Long) carData.get("sensorRange")).intValue();
         boolean isSafetyCar = (boolean) carData.get("isSafetyCar");
 
         double carWidth = 35;
         double carHeight = 30;
-        double d = sensorRange + Math.hypot(carWidth / 2.0, carHeight / 2.0); // Cálculo de `d`
+        double d = sensorRange + Math.hypot(carWidth / 2.0, carHeight / 2.0);
+
+        // Recupera a posição frontal e o ângulo do carro
+        int frontX = ((Long) carData.get("frontX")).intValue();
+        int frontY = ((Long) carData.get("frontY")).intValue();
+        double angle = (double) carData.get("angle");
 
         ImageView carImageView = new ImageView(this);
         carImageView.setImageResource(isSafetyCar ? R.drawable.safetycar : R.drawable.carro);
@@ -233,12 +240,20 @@ public class MainActivity extends AppCompatActivity {
         mainLayout.addView(comView);
         centerOfMassViews.add(comView);
 
-        Car car = new Car((String) carData.get("name"), x, y, speed, sensorRange,
+        // Cria o carro com a posição e ângulo restaurados
+        Car car = new Car((String) carData.get("name"), x, y, (int) speed, sensorRange,
                 findViewById(R.id.pista), d, carImageView, comView, handler, isSafetyCar);
-        cars.add(car);
 
+        car.setRotation((float) rotation); // Define a rotação inicial para manter a direção
+        car.setAngle(angle); // Define o ângulo restaurado
+        car.setFrontPosition(new Point(frontX, frontY)); // Define a posição frontal restaurada
+
+        cars.add(car);
         new Thread(car).start();
     }
+
+
+
     private void retrieveSavedCars() {
         FirebaseUtils.retrieveSavedCars(new FirebaseUtils.CarRetrieveCallback() {
             @Override

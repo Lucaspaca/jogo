@@ -38,6 +38,8 @@ public class Car extends Thread implements Veiculo {
     private static final int MIN_SPEED = 5;
     private static final int MAX_SPEED = 12;
     private Random random = new Random();
+    private float rotation;
+    private Point frontPosition;
 
     public Car(String name, double x, double y, double speed, int sensorRange,
                View trackView, double d,
@@ -112,6 +114,7 @@ public class Car extends Thread implements Veiculo {
         this.y = y;
     }
 
+
     public void checkCollision() {
         // Verifica colisão com bordas da pista
         if (x < 0 || x > trackView.getWidth() || y < 0 || y > trackView.getHeight()) {
@@ -138,6 +141,7 @@ public class Car extends Thread implements Veiculo {
                     // Ajusta a velocidade do carro aleatoriamente entre 5 e 25
                     setRandomSpeed();
 
+
                     // Verifica se o carro está para entrar na região restrita
                     if (isInRestrictedRegion() && !inRestrictedRegion) {
                         MainActivity.regionSemaphore.acquire(); // Tenta adquirir o permit
@@ -156,6 +160,7 @@ public class Car extends Thread implements Veiculo {
                     handler.post(() -> {
                         carImageView.setX((float) x);
                         carImageView.setY((float) y - 15);
+
 
                         Point centerOfMass = getCenterOfMassPosition();
                         if (centerOfMass != null) {
@@ -301,12 +306,25 @@ public class Car extends Thread implements Veiculo {
         carData.put("x", x);
         carData.put("y", y);
         carData.put("speed", speed);
+        carData.put("rotation", (double) carImageView.getRotation());
         carData.put("sensorRange", sensorRange);
         carData.put("isSafetyCar", isSafetyCar);
         carData.put("penalty", penalty);
-        // Adicione outros atributos necessários
+
+        // Adiciona a posição frontal e o ângulo
+        Point frontPosition = getFrontPosition();
+        carData.put("frontX", frontPosition.x);
+        carData.put("frontY", frontPosition.y);
+        carData.put("angle", angle); // Ângulo atual do carro
+
         return carData;
     }
+
+    public void setFrontPosition(Point frontPosition) {
+        this.frontPosition = frontPosition;
+    }
+
+
 
     public List<Point> scanForCarPixels() {
         Point frontPosition = getFrontPosition();
@@ -325,6 +343,10 @@ public class Car extends Thread implements Veiculo {
         }
 
         return detectedPixels;
+    }
+    public void setRotation(float rotation) {
+        this.rotation = rotation;
+        carImageView.setRotation(rotation);  // Aplica a rotação ao ImageView do carro
     }
 
 }
