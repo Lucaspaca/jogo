@@ -45,9 +45,6 @@ public class MathUtils {
         return Math.toDegrees(Math.atan2(deltaY, deltaX));
     }
 
-    public static double getD(int sensorRange, int carWidth, int carHeight) {
-        return sensorRange + Math.hypot(carWidth / 2.0, carHeight / 2.0);
-    }
 
     public static List<Point> scanForWhitePixels(Bitmap bitmap, Point frontPosition, double angle, int sensorRange, double d) {
         List<Point> whitePixels = new ArrayList<>();

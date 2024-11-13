@@ -7,8 +7,8 @@ import static org.junit.Assert.*;
 
 public class CarTest {
 
-    private static final int MIN_SPEED = 10; // exemplo de limite mínimo
-    private static final int MAX_SPEED = 100; // exemplo de limite máximo
+    private static final int MIN_SPEED = 5; // exemplo de limite mínimo
+    private static final int MAX_SPEED = 12; // exemplo de limite máximo
 
     private class Car {
         private int speed;

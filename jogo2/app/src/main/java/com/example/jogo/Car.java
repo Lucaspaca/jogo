@@ -71,38 +71,15 @@ public class Car extends Thread implements Veiculo {
     public double getY() {
         return this.y;
     }
-    public int getPenalty() {
-        return this.penalty;
-    }
-
-    public double getSpeed() {
-        return this.speed;
-    }
-
-    public int getSensorRange() {
-        return this.sensorRange;
-    }
-
-    public double getAngle() {
-        return this.angle;
-    }
-
-    public Point getCenterOfMass() {
-        return this.centerOfMass;
-    }
 
     public void setAngle(double angle) {
         this.angle = angle;
     }
 
-
     public void setPaused(boolean isPaused) {
         this.isPaused = isPaused;
     }
 
-    public void updateBitmap() {
-        this.bitmap = getBitmapFromView(trackView);
-    }
     private void setRandomSpeed() {
         this.speed = MIN_SPEED + random.nextInt(MAX_SPEED - MIN_SPEED + 1);
     }
@@ -110,10 +87,48 @@ public class Car extends Thread implements Veiculo {
     public void setX(double x) {
         this.x = x;
     }
+
     public void setY(double y) {
         this.y = y;
     }
 
+    public void setRotation(float rotation) {
+        this.rotation = rotation;
+        carImageView.setRotation(rotation);  // Aplica a rotação ao ImageView do carro
+    }
+
+    private Bitmap getBitmapFromView(View view) {
+        Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        view.draw(canvas);
+        return bitmap;
+    }
+
+    public Point getFrontPosition() {
+        return MathUtils.getFrontPosition(getPosicao(), angle);
+    }
+
+    public Point getCenterOfMassPosition() {
+        // Usa o novo método de cálculo do centro de massa que inclui os carros
+        Point centerMass = calculateCenterOfMass
+                ();
+        return (centerMass != null) ? centerMass : getFrontPosition();
+    }
+
+    @Override
+    public Point getPosicao() {
+        return new Point((int) x, (int) y);
+    }
+
+    @Override
+    public void setPosicao(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public void setFrontPosition(Point frontPosition) {
+        this.frontPosition = frontPosition;
+    }
 
     public void checkCollision() {
         // Verifica colisão com bordas da pista
@@ -214,22 +229,6 @@ public class Car extends Thread implements Veiculo {
         }
     }
 
-    public List<Point> scanForWhitePixels() {
-        Point frontPosition = getFrontPosition();
-        return MathUtils.scanForWhitePixels(bitmap, frontPosition, angle, sensorRange, d);
-    }
-
-    private Bitmap getBitmapFromView(View view) {
-        Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        view.draw(canvas);
-        return bitmap;
-    }
-
-    public double getD() {
-        return this.d; // Retorna o valor de d
-    }
-
     public Point calculateCenterOfMass() {
         // Usa o novo método para obter pixels brancos e dos carros
         List<Point> relevantPixels = scanForCarPixels();
@@ -262,17 +261,6 @@ public class Car extends Thread implements Veiculo {
         }
     }
 
-    public Point getFrontPosition() {
-        return MathUtils.getFrontPosition(getPosicao(), angle);
-    }
-
-    public Point getCenterOfMassPosition() {
-        // Usa o novo método de cálculo do centro de massa que inclui os carros
-        Point centerMass = calculateCenterOfMass
-                ();
-        return (centerMass != null) ? centerMass : getFrontPosition();
-    }
-
     @Override
     public void mover() {
         if (!isPaused) {
@@ -285,16 +273,6 @@ public class Car extends Thread implements Veiculo {
         isRunning = false;
     }
 
-    @Override
-    public Point getPosicao() {
-        return new Point((int) x, (int) y);
-    }
-
-    @Override
-    public void setPosicao(double x, double y) {
-        this.x = x;
-        this.y = y;
-    }
     public boolean isInRestrictedRegion() {
         return x >= MainActivity.regionLeft && x <= MainActivity.regionRight &&
                 y >= MainActivity.regionBottom && y <= MainActivity.regionTop;
@@ -320,12 +298,6 @@ public class Car extends Thread implements Veiculo {
         return carData;
     }
 
-    public void setFrontPosition(Point frontPosition) {
-        this.frontPosition = frontPosition;
-    }
-
-
-
     public List<Point> scanForCarPixels() {
         Point frontPosition = getFrontPosition();
         List<Point> detectedPixels = MathUtils.scanForWhitePixels(bitmap, frontPosition, angle, sensorRange, d);
@@ -344,10 +316,5 @@ public class Car extends Thread implements Veiculo {
 
         return detectedPixels;
     }
-    public void setRotation(float rotation) {
-        this.rotation = rotation;
-        carImageView.setRotation(rotation);  // Aplica a rotação ao ImageView do carro
-    }
-
 }
 
