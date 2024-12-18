@@ -25,6 +25,7 @@ import java.util.HashMap;
 import android.util.Log;
 import com.example.mathlibrary.FirebaseUtils;
 
+
 public class MainActivity extends AppCompatActivity {
 
     public static List<Car> cars;
@@ -44,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
     public static int regionRight = 350; // Coordenada X direita do retângulo
     public static int regionBottom = 230; // Coordenada Y inferior do retângulo
     private FirebaseFirestore db;
+    private long tempoInicioAtividade;
+    private long tempo_fim;
 
 
     @Override
@@ -52,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
 
+        tempoInicioAtividade = System.nanoTime();
         veiculos = new ArrayList<>();
         cars = new ArrayList<>();
         carImageViews = new ArrayList<>();
@@ -100,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
                 createCar(i);
             }
             isPaused = false;
-            createSafetyCar();
+//            createSafetyCar();
 
             for (Veiculo veiculo : veiculos) {
                 new Thread((Runnable) veiculo).start();
@@ -158,10 +162,12 @@ public class MainActivity extends AppCompatActivity {
         int sensorRange = 20;
         double d = sensorRange + Math.hypot(carWidth / 2.0, carHeight / 2.0);
 
-        double initialX = 315 -(index*60);
-        double initialY = 650;
+        double initialX = 315; // Posição X comum
+        double initialY = 650; // Posição Y comum
+
         lapCounts.add(0);
 
+        // Criação do ImageView para o carro
         ImageView carImageView = new ImageView(this);
         carImageView.setImageResource(R.drawable.carro);
         carImageView.setLayoutParams(new ConstraintLayout.LayoutParams(40, 35));
@@ -170,44 +176,53 @@ public class MainActivity extends AppCompatActivity {
         mainLayout.addView(carImageView);
         carImageViews.add(carImageView);
 
+        // Criação do View para o centro de massa do carro
         View comView = new View(this);
         comView.setBackgroundColor(Color.BLACK);
         comView.setLayoutParams(new ConstraintLayout.LayoutParams(5, 5));
         mainLayout.addView(comView);
         centerOfMassViews.add(comView);
 
+        // Criação do carro
         Car car = new Car("Carro " + (index + 1), initialX , initialY, 7, sensorRange,
                 findViewById(R.id.pista), d, carImageView, comView, handler, false);
         cars.add(car);
 
-        new Thread(car).start();
+        // Adicionando o delay entre a criação dos carros
+        long delay = index * 750; // Define o tempo de delay (exemplo: 1 segundo entre cada carro)
+
+        // Usando Handler para executar a criação do carro com delay
+        handler.postDelayed(() -> {
+            new Thread(car).start();
+        }, delay);
     }
-    private void createSafetyCar() {
-        double initialX = 380;
-        double initialY = 650;
-        int sensorRange = 20;
-        double d = sensorRange + Math.hypot(35 / 2.0, 30 / 2.0);
 
-        ImageView carImageView = new ImageView(this);
-        carImageView.setImageResource(R.drawable.safetycar); // Imagem do safety car
-        carImageView.setLayoutParams(new ConstraintLayout.LayoutParams(40, 30));
-        carImageView.setX((float) initialX);
-        carImageView.setY((float) initialY - 15);
-        mainLayout.addView(carImageView);
-        carImageViews.add(carImageView);
-
-        View comView = new View(this);
-        comView.setBackgroundColor(Color.BLACK);
-        comView.setLayoutParams(new ConstraintLayout.LayoutParams(5, 5));
-        mainLayout.addView(comView);
-        centerOfMassViews.add(comView);
-
-        Car safetyCar = new Car("Safety Car", initialX, initialY, 7, sensorRange,
-                findViewById(R.id.pista), d, carImageView, comView, handler, true);
-        cars.add(safetyCar);
-
-        new Thread(safetyCar).start();
-    }
+//    private void createSafetyCar() {
+//        double initialX = 380;
+//        double initialY = 650;
+//        int sensorRange = 20;
+//        double d = sensorRange + Math.hypot(35 / 2.0, 30 / 2.0);
+//
+//        ImageView carImageView = new ImageView(this);
+//        carImageView.setImageResource(R.drawable.safetycar); // Imagem do safety car
+//        carImageView.setLayoutParams(new ConstraintLayout.LayoutParams(40, 30));
+//        carImageView.setX((float) initialX);
+//        carImageView.setY((float) initialY - 15);
+//        mainLayout.addView(carImageView);
+//        carImageViews.add(carImageView);
+//
+//        View comView = new View(this);
+//        comView.setBackgroundColor(Color.BLACK);
+//        comView.setLayoutParams(new ConstraintLayout.LayoutParams(5, 5));
+//        mainLayout.addView(comView);
+//        centerOfMassViews.add(comView);
+//
+//        Car safetyCar = new Car("Safety Car", initialX, initialY, 7, sensorRange,
+//                findViewById(R.id.pista), d, carImageView, comView, handler, true);
+//        cars.add(safetyCar);
+//
+//        new Thread(safetyCar).start();
+//    }
 
     private void restoreCar(Map<String, Object> carData) {
         double x = (double) carData.get("x");
@@ -284,5 +299,6 @@ public class MainActivity extends AppCompatActivity {
             });
         }
     }
+
 
 }

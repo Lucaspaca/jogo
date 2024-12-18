@@ -9,11 +9,15 @@ import android.widget.ImageView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import android.os.Handler;
 import java.util.Map;
 import java.util.HashMap;
 import com.example.mathlibrary.MathUtils;
+import android.util.Log;
+import android.os.Process;
 
 public class Car extends Thread implements Veiculo {
     private String name;
@@ -40,6 +44,18 @@ public class Car extends Thread implements Veiculo {
     private Random random = new Random();
     private float rotation;
     private Point frontPosition;
+    private long tempo_inicio;
+    private long tempo_fim;
+    List<Long> executionTimesForCenterOfMass = new ArrayList<>();
+    private long tempo_inicioAtividade;
+    private long tempo_fimCalculate;
+    private long tempo_fimScan;
+    private long tempo_fimMove;
+    private long tempo_inicioCalculate;
+    private long tempo_inicioScan;
+    private long tempo_fimEScan;
+    private final ExecutorService executorService = Executors.newFixedThreadPool(1);
+
 
     public Car(String name, double x, double y, double speed, int sensorRange,
                View trackView, double d,
@@ -62,7 +78,26 @@ public class Car extends Thread implements Veiculo {
         this.penalty = 0;
         this.isSafetyCar = isSafetyCar;
     }
+    public Bitmap getBitmap() {
+        return bitmap;
+    }
+    public void setCenterOfMass(Point centerOfMass) {
+        this.centerOfMass = centerOfMass;
+    }
+    public double getAngle() {
+        return angle;
+    }
 
+    public int getSensorRange() {
+        return sensorRange;
+    }
+
+    public double getD() {
+        return d;
+    }
+    public long getTempoInicioAtividade() {
+        return tempo_inicioAtividade;
+    }
     // Getters e Setters
     public double getX() {
         return this.x;
@@ -83,6 +118,9 @@ public class Car extends Thread implements Veiculo {
     private void setRandomSpeed() {
         this.speed = MIN_SPEED + random.nextInt(MAX_SPEED - MIN_SPEED + 1);
     }
+    public double getCarWidth() {
+        return carWidth;
+    }
 
     public void setX(double x) {
         this.x = x;
@@ -95,6 +133,9 @@ public class Car extends Thread implements Veiculo {
     public void setRotation(float rotation) {
         this.rotation = rotation;
         carImageView.setRotation(rotation);  // Aplica a rotação ao ImageView do carro
+    }
+    public double getSpeed() {
+        return speed;
     }
 
     private Bitmap getBitmapFromView(View view) {
@@ -146,6 +187,10 @@ public class Car extends Thread implements Veiculo {
 
     @Override
     public void run() {
+//        tempo_inicioAtividade = System.nanoTime();
+//        Log.i("CarTask", "Início da atividade " + name + ": " +
+//                (tempo_inicioAtividade / 1_000_000_000.0) + " segundos.");
+
         boolean inRestrictedRegion = false; // Controle para saber se o carro está na região
         if (isSafetyCar) {
             setPriority(Thread.MAX_PRIORITY); // Atribuir prioridade máxima
@@ -153,14 +198,26 @@ public class Car extends Thread implements Veiculo {
         while (isRunning) {
             if (!isPaused) {
                 try {
-                    // Ajusta a velocidade do carro aleatoriamente entre 5 e 25
                     setRandomSpeed();
 
+                    int numThreads = Runtime.getRuntime().availableProcessors(); // qtd
+                    //processadores disponíveis
+                    ExecutorService executor = Executors.newFixedThreadPool(1);
+
+                    executor.submit(() ->{
+                        tempo_inicioAtividade = System.nanoTime();
+                        Log.i("CarTask", "Início da atividade " + name + ": " +
+                                (tempo_inicioAtividade / 1_000_000_000.0) + " segundos.");
+                        executorService.submit(new ScanForCarPixelsTask(this));
+                        executorService.submit(new CalculateCenterOfMassTask(this));
+                        executorService.submit(new MoveTowardsTask(this, getCenterOfMassPosition()));
+
+});
 
                     // Verifica se o carro está para entrar na região restrita
                     if (isInRestrictedRegion() && !inRestrictedRegion) {
-                        MainActivity.regionSemaphore.acquire(); // Tenta adquirir o permit
-                        inRestrictedRegion = true; // Marca que o carro está na região
+                        MainActivity.regionSemaphore.acquire();
+                        inRestrictedRegion = true;
                     }
 
                     // Se o carro saiu da região restrita, libera o permit
@@ -169,13 +226,11 @@ public class Car extends Thread implements Veiculo {
                         inRestrictedRegion = false;
                     }
 
-                    moveTowards(getCenterOfMassPosition());
-                    checkCollision();
+//                    moveTowards(getCenterOfMassPosition());
 
                     handler.post(() -> {
                         carImageView.setX((float) x);
                         carImageView.setY((float) y - 15);
-
 
                         Point centerOfMass = getCenterOfMassPosition();
                         if (centerOfMass != null) {
@@ -214,11 +269,14 @@ public class Car extends Thread implements Veiculo {
             }
         }
 
-        // Se o carro estiver na região restrita ao parar, libera o semaphore
         if (inRestrictedRegion) {
             MainActivity.regionSemaphore.release();
         }
+
+        tempo_fim = System.nanoTime();
+
     }
+
 
 
         public void updateRotation(Point target) {
@@ -230,14 +288,40 @@ public class Car extends Thread implements Veiculo {
     }
 
     public Point calculateCenterOfMass() {
+        int coreNumber = 0; // Escolha o núcleo que você deseja usar
+        int mask = 1 << coreNumber; // Cria uma máscara para o núcleo escolhido
+        Process.setThreadPriority(Process.myTid(), mask); // Aplica a máscara ao
+        tempo_inicioCalculate = System.nanoTime();
+
         // Usa o novo método para obter pixels brancos e dos carros
         List<Point> relevantPixels = scanForCarPixels();
         centerOfMass = MathUtils.calculateCenterOfMass(relevantPixels);
+
+        tempo_fimCalculate = System.nanoTime();
+
+        // Calcula o tempo de execução da função
+        long tempoExecucao = tempo_fimCalculate - tempo_inicioCalculate;
+        executionTimesForCenterOfMass.add(tempoExecucao); // Armazena o tempo de execução
+
+//        Log.e("CenterOfMassTiming", "Tempo de execução do cálculo do centro de massa " + name + ": " +
+//                (tempoExecucao / 1_000_000_000.0) + " segundos.");
+//        Log.i("CarTask", "Finalizando calculateCenterOfMass para o carro " + name + ": " + (tempo_fimCalculate  - tempo_inicioAtividade)/ 1_000_000_000.0);
+
         return centerOfMass;
     }
 
+    // Lista para armazenar os tempos de execução
+    List<Long> executionTimesForMoveTowards = new ArrayList<>();
+
     @Override
     public void moveTowards(Point target) {
+        int coreNumber = 0; // Escolha o núcleo que você deseja usar
+        int mask = 1 << coreNumber; // Cria uma máscara para o núcleo escolhido
+        Process.setThreadPriority(Process.myTid(), mask); // Aplica a máscara ao
+        tempo_inicio = System.nanoTime();
+        tempo_fimMove = System.nanoTime();
+
+
         if (target != null) {
             Point newPosition = MathUtils.moveTowards(getPosicao(), target, speed);
 
@@ -259,6 +343,17 @@ public class Car extends Thread implements Veiculo {
             this.y = newPosition.y;
             this.angle = MathUtils.calculateAngle(getPosicao(), target);
         }
+
+        tempo_fim = System.nanoTime();
+
+        // Calcula o tempo de execução da função
+        long tempoExecucao = tempo_fim - tempo_inicio;
+        executionTimesForMoveTowards.add(tempoExecucao); // Armazena o tempo de execução
+
+//        Log.e("MoveTowardsTiming", "Tempo de execução do movimento do carro " + name + ": " +
+//                (tempoExecucao / 1_000_000_000.0) + " segundos.");
+//        Log.i("CarTask", "Finalizando moveTowards para o carro " + name + ": " + (tempo_fimMove  - tempo_inicioAtividade)/ 1_000_000_000.0);
+
     }
 
     @Override
@@ -279,6 +374,8 @@ public class Car extends Thread implements Veiculo {
     }
 
     public Map<String, Object> toMap() {
+        tempo_inicio = System.nanoTime();
+
         Map<String, Object> carData = new HashMap<>();
         carData.put("name", name);
         carData.put("x", x);
@@ -298,7 +395,15 @@ public class Car extends Thread implements Veiculo {
         return carData;
     }
 
+    // List to store the times for multiple runs
+    List<Long> executionTimes = new ArrayList<>();
+
     public List<Point> scanForCarPixels() {
+
+        tempo_inicioScan = System.nanoTime();
+        tempo_fimScan = System.nanoTime();
+
+        // Código da função original
         Point frontPosition = getFrontPosition();
         List<Point> detectedPixels = MathUtils.scanForWhitePixels(bitmap, frontPosition, angle, sensorRange, d);
 
@@ -313,6 +418,17 @@ public class Car extends Thread implements Veiculo {
                 }
             }
         }
+
+        tempo_fimEScan = System.nanoTime();
+
+        // Calcula o tempo de execução da função
+        long tempoExecucao = tempo_fimScan - tempo_inicioScan;
+        executionTimes.add(tempoExecucao); // Armazena o tempo de execução
+
+//        Log.e("SensorTiming", "nao podes " + name + ": " +
+//                (tempoExecucao / 1_000_000_000.0) + " segundos.");
+//
+//        Log.i("CarTask", "nao " + name + ": " + (tempo_fimScan  - tempo_inicioAtividade)/ 1_000_000_000.0) ;
 
         return detectedPixels;
     }
