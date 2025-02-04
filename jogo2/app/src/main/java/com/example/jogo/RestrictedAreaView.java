@@ -13,7 +13,7 @@ public class RestrictedAreaView extends View {
     public RestrictedAreaView(Context context) {
         super(context);
         paint = new Paint();
-        paint.setColor(Color.argb(128, 0, 255, 0)); // Cor da zona restrita
+        paint.setColor(Color.argb(255, 255, 0, 0)); // Cor da zona restrita
         paint.setStyle(Paint.Style.FILL);
     }
 

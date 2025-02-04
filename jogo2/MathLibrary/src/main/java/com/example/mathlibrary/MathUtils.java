@@ -55,7 +55,7 @@ public class MathUtils {
         int height = bitmap.getHeight();
 
         double angleRad = Math.toRadians(angle);
-        double halfConeRad = Math.PI / 2; // 45 graus para cada lado
+        double halfConeRad = Math.PI/2; // 45 graus para cada lado
         int sensorRangeSquared = sensorRange * sensorRange;
 
         for (int i = -sensorRange; i <= sensorRange; i++) {
@@ -93,8 +93,8 @@ public class MathUtils {
 
     public static Point getFrontPosition(Point current, double angle) {
         double angleRad = Math.toRadians(angle);
-        int frontX = (int) (current.x + Math.cos(angleRad) * 30);
-        int frontY = (int) (current.y + Math.sin(angleRad) * 40);
+        int frontX = (int) (current.x + Math.cos(angleRad) *10);
+        int frontY = (int) (current.y + Math.sin(angleRad) * 10);
         return new Point(frontX, frontY);
     }
 

@@ -4,6 +4,8 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Point;
+import android.graphics.Rect;
+import android.os.Looper;
 import android.view.View;
 import android.widget.ImageView;
 import java.util.ArrayList;
@@ -18,6 +20,11 @@ import java.util.HashMap;
 import com.example.mathlibrary.MathUtils;
 import android.util.Log;
 import android.os.Process;
+import android.os.SystemClock;
+import java.util.Collections;
+
+
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 public class Car extends Thread implements Veiculo {
     private String name;
@@ -38,9 +45,11 @@ public class Car extends Thread implements Veiculo {
     private Handler handler;
     private Bitmap bitmap;
     private int penalty;
-    private boolean isSafetyCar;;
-    private static final int MIN_SPEED = 5;
-    private static final int MAX_SPEED = 12;
+    private boolean isSafetyCar;
+    private boolean hasWaited = false;
+
+    private static final int MIN_SPEED = 0;
+    private static final int MAX_SPEED = 9;
     private Random random = new Random();
     private float rotation;
     private Point frontPosition;
@@ -55,6 +64,13 @@ public class Car extends Thread implements Veiculo {
     private long tempo_inicioScan;
     private long tempo_fimEScan;
     private final ExecutorService executorService = Executors.newFixedThreadPool(1);
+    private long lastTimestamp;
+    private List<Long> flowMeterTimes;
+    private long[] times = new long[10]; // vetor para armazenar até 10 tempos
+    private int timeIndex = 0; // índice para inserir no vetor
+    private long lastTime = -1; // variável para armazenar o tempo do último medidor
+    private ImageView imageView;
+    long startTime = System.nanoTime();
 
 
     public Car(String name, double x, double y, double speed, int sensorRange,
@@ -77,13 +93,17 @@ public class Car extends Thread implements Veiculo {
         this.bitmap = getBitmapFromView(trackView);
         this.penalty = 0;
         this.isSafetyCar = isSafetyCar;
+
     }
+
     public Bitmap getBitmap() {
         return bitmap;
     }
+
     public void setCenterOfMass(Point centerOfMass) {
         this.centerOfMass = centerOfMass;
     }
+
     public double getAngle() {
         return angle;
     }
@@ -91,13 +111,46 @@ public class Car extends Thread implements Veiculo {
     public int getSensorRange() {
         return sensorRange;
     }
-
+    public void setSpeed(double speed) {
+       this.speed = speed;
+    }
     public double getD() {
         return d;
     }
+
     public long getTempoInicioAtividade() {
         return tempo_inicioAtividade;
     }
+
+    public ImageView getImageView() {
+        return imageView;
+    }
+
+    public void setImageView(ImageView imageView) {
+        this.imageView = imageView;
+    }
+    private boolean waiting = false; // Flag para evitar múltiplas pausas
+
+    private void checkWaitRegion() {
+        for (Rect region : MainActivity.getWaitRegions()) {
+            if (region.contains((int) x, (int) y)) {
+                if (!hasWaited) {
+                    long waitTime = 100 + random.nextInt(901); // Tempo entre 100 e 1000 ms
+                    try {
+                        Thread.sleep(waitTime);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    hasWaited = true;
+                }
+                return;
+            }
+        }
+        hasWaited = false; // Reseta quando sai da região
+    }
+
+
+
     // Getters e Setters
     public double getX() {
         return this.x;
@@ -118,6 +171,7 @@ public class Car extends Thread implements Veiculo {
     private void setRandomSpeed() {
         this.speed = MIN_SPEED + random.nextInt(MAX_SPEED - MIN_SPEED + 1);
     }
+
     public double getCarWidth() {
         return carWidth;
     }
@@ -134,9 +188,11 @@ public class Car extends Thread implements Veiculo {
         this.rotation = rotation;
         carImageView.setRotation(rotation);  // Aplica a rotação ao ImageView do carro
     }
+
     public double getSpeed() {
         return speed;
     }
+
 
     private Bitmap getBitmapFromView(View view) {
         Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
@@ -185,48 +241,47 @@ public class Car extends Thread implements Veiculo {
         }
     }
 
+
+
     @Override
     public void run() {
-//        tempo_inicioAtividade = System.nanoTime();
-//        Log.i("CarTask", "Início da atividade " + name + ": " +
-//                (tempo_inicioAtividade / 1_000_000_000.0) + " segundos.");
+        carIsAtMeter();
+        tempo_inicioAtividade = System.nanoTime();
+        boolean inRestrictedRegion = false;
 
-        boolean inRestrictedRegion = false; // Controle para saber se o carro está na região
         if (isSafetyCar) {
-            setPriority(Thread.MAX_PRIORITY); // Atribuir prioridade máxima
+            setPriority(Thread.MAX_PRIORITY);
         }
+
         while (isRunning) {
-            if (!isPaused) {
+            checkWaitRegion();
+            long currentTime = System.nanoTime();
+            double elapsedTime = (currentTime - startTime) / 1_000_000_000.0; // Converte para segundos
+            Point target = new Point(850, 575);
+            double totalTime =22; // Tempo total desejado
+
+            double requiredSpeed = calculateRequiredSpeed(target, totalTime, elapsedTime);
+            setSpeed(requiredSpeed);
+
+            if (!isPaused) {  // Só continua se não estiver pausado
                 try {
-                    setRandomSpeed();
 
-                    int numThreads = Runtime.getRuntime().availableProcessors(); // qtd
-                    //processadores disponíveis
-                    ExecutorService executor = Executors.newFixedThreadPool(1);
+                    carIsAtMeter();
+                    MainActivity.drawFlowMeters();
 
-                    executor.submit(() ->{
-                        tempo_inicioAtividade = System.nanoTime();
-                        Log.i("CarTask", "Início da atividade " + name + ": " +
-                                (tempo_inicioAtividade / 1_000_000_000.0) + " segundos.");
-                        executorService.submit(new ScanForCarPixelsTask(this));
-                        executorService.submit(new CalculateCenterOfMassTask(this));
-                        executorService.submit(new MoveTowardsTask(this, getCenterOfMassPosition()));
+                    executorService.submit(new ScanForCarPixelsTask(this));
+                    executorService.submit(new CalculateCenterOfMassTask(this));
+                    executorService.submit(new MoveTowardsTask(this, getCenterOfMassPosition()));
 
-});
-
-                    // Verifica se o carro está para entrar na região restrita
                     if (isInRestrictedRegion() && !inRestrictedRegion) {
                         MainActivity.regionSemaphore.acquire();
                         inRestrictedRegion = true;
                     }
 
-                    // Se o carro saiu da região restrita, libera o permit
                     if (!isInRestrictedRegion() && inRestrictedRegion) {
                         MainActivity.regionSemaphore.release();
                         inRestrictedRegion = false;
                     }
-
-//                    moveTowards(getCenterOfMassPosition());
 
                     handler.post(() -> {
                         carImageView.setX((float) x);
@@ -263,7 +318,7 @@ public class Car extends Thread implements Veiculo {
             }
 
             try {
-                Thread.sleep(43);
+                Thread.sleep(43); // Controle da taxa de atualização
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -274,12 +329,13 @@ public class Car extends Thread implements Veiculo {
         }
 
         tempo_fim = System.nanoTime();
-
     }
 
 
 
-        public void updateRotation(Point target) {
+
+
+    public void updateRotation(Point target) {
         if (target != null) {
             double angleToTarget = MathUtils.calculateAngle(getPosicao(), target);
             float newRotation = MathUtils.updateRotation(carImageView.getRotation(), angleToTarget);
@@ -432,5 +488,145 @@ public class Car extends Thread implements Veiculo {
 
         return detectedPixels;
     }
+
+
+    // Método para verificar se o carro está no medidor (substitua com a lógica do seu jogo)
+    // Mover a lista meterPassed para fora do método, para garantir que ela seja persistente entre as chamadas
+    private List<Boolean> meterPassed = new ArrayList<>();
+
+    // Mover a lista meterPassed para fora do método, para garantir que ela seja persistente entre as chamadas
+
+
+    private void carIsAtMeter() {
+        List<Rect> flowMeter = MainActivity.getFlowMeter();
+
+        // Inicializa a lista meterPassed, caso ela ainda não tenha sido inicializada
+        if (meterPassed.size() != flowMeter.size()) {
+            meterPassed = new ArrayList<>(Collections.nCopies(flowMeter.size(), false));
+        }
+
+        // Raio de tolerância
+        final int toleranceRadius = 1;
+
+        // Posições do carro
+        double carLeft = getX();
+        double carRight = carLeft + 40;  // Largura do carro
+        double carTop = getY();
+        double carBottom = carTop + 35;  // Altura do carro
+
+        // Variáveis para armazenar o sensor mais próximo
+        double minDistance = Double.MAX_VALUE;
+        int closestMeterIndex = -1;
+
+        for (int i = 0; i < flowMeter.size(); i++) {
+            Rect meter = flowMeter.get(i);
+
+            // Verifica se alguma parte do carro está dentro do medidor, considerando a tolerância
+            boolean carIsInMeterX = (carRight >= meter.left - toleranceRadius) && (carLeft <= meter.right + toleranceRadius);
+            boolean carIsInMeterY = (carBottom >= meter.top - toleranceRadius) && (carTop <= meter.bottom + toleranceRadius);
+
+            // Se o carro estiver dentro dos limites do medidor e ainda não passou por ele
+            if (carIsInMeterX && carIsInMeterY && !meterPassed.get(i)) {
+                long currentTime = System.nanoTime();
+                MainActivity.addFlowMeterTime(currentTime);
+
+                // Marca esse medidor como já "passado"
+                meterPassed.set(i, true);
+
+                // Log para saber que o carro passou pelo medidor
+                Log.d("CarFlowMeter", "Passou pelo medidor " + (i + 1));
+            }
+
+            // Calcular a distância do carro para o medidor
+            double meterCenterX = (meter.left + meter.right) / 2.0;
+            double meterCenterY = (meter.top + meter.bottom) / 2.0;
+            double distance = Math.sqrt(Math.pow(carLeft - meterCenterX, 2) + Math.pow(carTop - meterCenterY, 2));
+
+            // Verifica se esse medidor é o mais próximo
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestMeterIndex = i;
+            }
+        }
+
+        // Se foi encontrado um sensor mais próximo, podemos usar a variável closestMeterIndex
+        if (closestMeterIndex != -1) {
+            Rect closestMeter = flowMeter.get(closestMeterIndex);
+            Log.d("ClosestMeter", "Sensor mais próximo: " + (closestMeterIndex + 1) + " na posição (" + closestMeter.left + ", " + closestMeter.top + ")");
+        }
+    }
+
+
+    public double calculateRequiredSpeed(Point target, double totalTime, double elapsedTime) {
+        // Verifica se o tempo total e o tempo decorrido são válidos
+        if (totalTime <= 0 || elapsedTime < 0) {
+            throw new IllegalArgumentException("O tempo total deve ser maior que zero e o tempo decorrido não pode ser negativo.");
+        }
+
+        // Calcula a distância entre a posição atual do carro e o ponto alvo
+        double distance = Math.hypot(target.x - this.x, target.y - this.y);
+
+        // Calcula o tempo restante para alcançar o ponto alvo
+        double remainingTime = totalTime - elapsedTime;
+
+        // Se o tempo restante for menor ou igual a zero, retorna a velocidade máxima possível
+        if (remainingTime <= 0) {
+            Log.d("SpeedCalculation", "Velocidade máxima: " + MAX_SPEED);
+            return MAX_SPEED; // Retorna a velocidade máxima definida
+        }
+
+        // Calcula a velocidade necessária para alcançar o ponto alvo no tempo restante
+        double requiredSpeed = distance / remainingTime;
+
+        // Isso pode ser ajustado conforme o comportamento esperado
+        if (requiredSpeed > MAX_SPEED) {
+            requiredSpeed = MAX_SPEED;  // Limita a velocidade máxima
+        }
+
+
+        return requiredSpeed;
+    }
+
+
+
+
+
+
+
+
+
 }
+
+//qual
+
+
+
+
+
+//    private void measureTimeAtMeter(Point meter) {
+//        // Verifica se o carro passou pelo medidor
+//        if (carIsAtMeter(meter)) {
+//            long currentTime = System.currentTimeMillis();  // Captura o tempo atual
+//
+//            // Se o tempo do último medidor foi registrado, calcula o tempo
+//            if (lastTime != -1) {
+//                long timeDifference = currentTime - lastTime;
+//                if (timeIndex < times.length) {
+//                    times[timeIndex] = timeDifference; // Armazena o tempo no vetor
+//                    timeIndex++; // Incrementa o índice para o próximo tempo
+//
+//                    // Imprime o tempo registrado no log
+//                    Log.d("CarTime", "Tempo registrado no medidor " + timeIndex + ": " + timeDifference + " ms");
+//                }
+//            }
+//
+//            // Atualiza o tempo do último medidor
+//            lastTime = currentTime;
+//        }
+//    }
+
+
+
+
+
 
